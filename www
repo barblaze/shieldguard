@@ -1,0 +1,753 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#0f172a">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>ShieldGuard SAST</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;700;800&display=swap" rel="stylesheet">
+
+    <!-- Hidden file input for mobile -->
+    <input type="file" id="fileInput" multiple webkitdirectory style="display:none" accept="">
+
+    <style>
+        :root {
+            --bg: #070b14;
+            --surface: #0f172a;
+            --surface2: #1a2540;
+            --border: #1e3059;
+            --accent: #3b82f6;
+            --accent2: #06b6d4;
+            --danger: #ef4444;
+            --warn: #f97316;
+            --mid: #eab308;
+            --safe: #22c55e;
+            --text: #e2e8f0;
+            --muted: #475569;
+            --mono: 'Space Mono', monospace;
+            --sans: 'Syne', sans-serif;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: var(--sans);
+            min-height: 100dvh;
+            overflow-x: hidden;
+        }
+
+        /* ── Grid BG ── */
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background-image:
+                linear-gradient(rgba(59,130,246,0.04) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(59,130,246,0.04) 1px, transparent 1px);
+            background-size: 32px 32px;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .app { position: relative; z-index: 1; max-width: 480px; margin: 0 auto; padding: 0 0 80px; }
+
+        /* ── Top Bar ── */
+        .topbar {
+            position: sticky;
+            top: 0;
+            z-index: 50;
+            background: rgba(7,11,20,0.92);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border-bottom: 1px solid var(--border);
+            padding: 14px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .logo-icon {
+            width: 32px; height: 32px;
+            background: linear-gradient(135deg, var(--accent), var(--accent2));
+            border-radius: 8px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 16px;
+            box-shadow: 0 0 16px rgba(59,130,246,0.4);
+        }
+
+        .logo-text { font-size: 17px; font-weight: 800; letter-spacing: -0.5px; }
+        .logo-text span { color: var(--accent2); }
+
+        .version-badge {
+            font-family: var(--mono);
+            font-size: 9px;
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            color: var(--muted);
+            padding: 3px 7px;
+            border-radius: 999px;
+            letter-spacing: 1px;
+        }
+
+        /* ── Hero Section ── */
+        .hero {
+            padding: 32px 20px 24px;
+            text-align: center;
+        }
+
+        .hero-subtitle {
+            font-family: var(--mono);
+            font-size: 10px;
+            letter-spacing: 2px;
+            color: var(--accent);
+            text-transform: uppercase;
+            margin-bottom: 10px;
+        }
+
+        .hero-title {
+            font-size: 28px;
+            font-weight: 800;
+            line-height: 1.1;
+            letter-spacing: -1px;
+            margin-bottom: 10px;
+        }
+
+        .hero-desc {
+            font-size: 13px;
+            color: var(--muted);
+            line-height: 1.6;
+            max-width: 300px;
+            margin: 0 auto;
+        }
+
+        /* ── Scan Button ── */
+        .scan-zone {
+            padding: 0 20px 28px;
+        }
+
+        .scan-btn {
+            width: 100%;
+            background: linear-gradient(135deg, var(--accent) 0%, #1d4ed8 100%);
+            border: none;
+            border-radius: 16px;
+            padding: 18px 24px;
+            color: #fff;
+            font-family: var(--sans);
+            font-size: 16px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            cursor: pointer;
+            box-shadow: 0 8px 32px rgba(59,130,246,0.35);
+            transition: transform 0.15s, box-shadow 0.15s;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .scan-btn::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(135deg, rgba(255,255,255,0.15), transparent);
+            pointer-events: none;
+        }
+
+        .scan-btn:active { transform: scale(0.97); box-shadow: 0 4px 16px rgba(59,130,246,0.25); }
+        .scan-btn:disabled { opacity: 0.6; transform: none; }
+
+        .btn-icon { font-size: 20px; }
+
+        /* ── Progress Bar ── */
+        .progress-bar-wrap {
+            margin: 0 20px 24px;
+            display: none;
+        }
+        .progress-bar-wrap.visible { display: block; }
+
+        .progress-label {
+            font-family: var(--mono);
+            font-size: 10px;
+            color: var(--accent2);
+            margin-bottom: 8px;
+            letter-spacing: 1px;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .progress-track {
+            height: 4px;
+            background: var(--surface2);
+            border-radius: 99px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--accent), var(--accent2));
+            border-radius: 99px;
+            width: 0%;
+            transition: width 0.2s ease;
+        }
+
+        /* ── Stats Row ── */
+        .stats {
+            display: none;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 10px;
+            padding: 0 20px 24px;
+        }
+        .stats.visible { display: grid; }
+
+        .stat-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 14px 12px;
+            text-align: center;
+        }
+
+        .stat-label {
+            font-family: var(--mono);
+            font-size: 8px;
+            letter-spacing: 1.5px;
+            color: var(--muted);
+            text-transform: uppercase;
+            margin-bottom: 6px;
+        }
+
+        .stat-value {
+            font-size: 22px;
+            font-weight: 800;
+            line-height: 1;
+        }
+        .stat-value.red { color: var(--danger); }
+        .stat-value.cyan { color: var(--accent2); }
+        .stat-value.blue { color: var(--accent); }
+
+        /* ── Filter Bar ── */
+        .filter-bar {
+            display: none;
+            flex-wrap: nowrap;
+            overflow-x: auto;
+            gap: 8px;
+            padding: 0 20px 20px;
+            scrollbar-width: none;
+        }
+        .filter-bar::-webkit-scrollbar { display: none; }
+        .filter-bar.visible { display: flex; }
+
+        .filter-btn {
+            flex-shrink: 0;
+            font-family: var(--mono);
+            font-size: 10px;
+            letter-spacing: 0.5px;
+            border: 1px solid var(--border);
+            background: var(--surface);
+            color: var(--muted);
+            padding: 6px 14px;
+            border-radius: 999px;
+            cursor: pointer;
+            transition: all 0.15s;
+            white-space: nowrap;
+        }
+
+        .filter-btn.active {
+            background: var(--accent);
+            border-color: var(--accent);
+            color: #fff;
+        }
+
+        /* ── Results ── */
+        .results-section {
+            padding: 0 20px;
+        }
+
+        .section-title {
+            font-family: var(--mono);
+            font-size: 10px;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            color: var(--muted);
+            margin-bottom: 14px;
+        }
+
+        /* Empty State */
+        .empty-state {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 48px 24px;
+            text-align: center;
+        }
+
+        .empty-icon { font-size: 48px; margin-bottom: 16px; opacity: 0.5; }
+        .empty-title { font-size: 16px; font-weight: 700; margin-bottom: 8px; opacity: 0.7; }
+        .empty-desc { font-size: 12px; color: var(--muted); line-height: 1.6; }
+
+        /* Finding Cards */
+        .finding-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            margin-bottom: 10px;
+            overflow: hidden;
+            transition: border-color 0.2s;
+        }
+
+        .finding-card.sev-critico { border-left: 3px solid var(--danger); }
+        .finding-card.sev-alto    { border-left: 3px solid var(--warn); }
+        .finding-card.sev-medio   { border-left: 3px solid var(--mid); }
+
+        .card-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 14px 16px 10px;
+        }
+
+        .card-left { display: flex; align-items: center; gap: 10px; }
+
+        .card-type-badge {
+            font-family: var(--mono);
+            font-size: 8px;
+            letter-spacing: 1px;
+            font-weight: 700;
+            padding: 3px 7px;
+            border-radius: 6px;
+            background: var(--surface2);
+            color: var(--muted);
+            text-transform: uppercase;
+        }
+
+        .card-name { font-size: 14px; font-weight: 700; }
+
+        .sev-badge {
+            font-family: var(--mono);
+            font-size: 9px;
+            font-weight: 700;
+            letter-spacing: 1px;
+            padding: 4px 10px;
+            border-radius: 8px;
+            text-transform: uppercase;
+        }
+
+        .sev-badge.CRÍTICO { background: rgba(239,68,68,0.15); color: #f87171; border: 1px solid rgba(239,68,68,0.3); }
+        .sev-badge.ALTO    { background: rgba(249,115,22,0.15); color: #fb923c; border: 1px solid rgba(249,115,22,0.3); }
+        .sev-badge.MEDIO   { background: rgba(234,179,8,0.15);  color: #facc15; border: 1px solid rgba(234,179,8,0.3);  }
+
+        .card-path {
+            font-family: var(--mono);
+            font-size: 10px;
+            color: var(--muted);
+            padding: 0 16px 14px;
+            word-break: break-all;
+            line-height: 1.5;
+        }
+
+        /* Clean state */
+        .clean-card {
+            background: var(--surface);
+            border: 1px solid rgba(34,197,94,0.3);
+            border-radius: 20px;
+            padding: 40px 24px;
+            text-align: center;
+        }
+        .clean-icon { font-size: 48px; margin-bottom: 16px; }
+        .clean-title { font-size: 18px; font-weight: 800; color: var(--safe); margin-bottom: 8px; }
+        .clean-desc { font-size: 12px; color: var(--muted); }
+
+        /* ── Footer ── */
+        .footer {
+            margin-top: 32px;
+            padding: 0 20px;
+            text-align: center;
+            font-family: var(--mono);
+            font-size: 9px;
+            letter-spacing: 1px;
+            color: var(--muted);
+            line-height: 1.8;
+        }
+
+        /* ── Scanning animation ── */
+        @keyframes scan-pulse {
+            0%, 100% { box-shadow: 0 8px 32px rgba(59,130,246,0.35); }
+            50% { box-shadow: 0 8px 48px rgba(59,130,246,0.6), 0 0 80px rgba(6,182,212,0.2); }
+        }
+        .is-scanning-btn { animation: scan-pulse 1.2s infinite; }
+
+        @keyframes slide-in {
+            from { opacity: 0; transform: translateY(12px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+        .finding-card { animation: slide-in 0.3s ease both; }
+
+        /* Scanning indicator */
+        .scan-indicator {
+            display: none;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 12px 20px;
+            margin: 0 20px 20px;
+            background: rgba(59,130,246,0.08);
+            border: 1px solid rgba(59,130,246,0.2);
+            border-radius: 12px;
+            font-family: var(--mono);
+            font-size: 11px;
+            color: var(--accent);
+        }
+        .scan-indicator.visible { display: flex; }
+        
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .spinner {
+            width: 14px; height: 14px;
+            border: 2px solid rgba(59,130,246,0.3);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            flex-shrink: 0;
+        }
+    </style>
+</head>
+<body>
+<div class="app">
+
+    <!-- Top Bar -->
+    <div class="topbar">
+        <div class="logo">
+            <div class="logo-icon">🛡️</div>
+            <div class="logo-text">Shield<span>Guard</span></div>
+        </div>
+        <div class="version-badge">SAST v2.0</div>
+    </div>
+
+    <!-- Hero -->
+    <div class="hero">
+        <div class="hero-subtitle">// Auditoría de código</div>
+        <div class="hero-title">Análisis de<br>seguridad local</div>
+        <div class="hero-desc">Detecta secretos, vulnerabilidades y archivos sensibles. 100% privado.</div>
+    </div>
+
+    <!-- Scan Button -->
+    <div class="scan-zone">
+        <button class="scan-btn" id="scanBtn">
+            <span class="btn-icon">📂</span>
+            <span id="scanBtnLabel">Seleccionar Proyecto</span>
+        </button>
+    </div>
+
+    <!-- Scanning Indicator -->
+    <div class="scan-indicator" id="scanIndicator">
+        <div class="spinner"></div>
+        <span id="scanIndicatorText">Analizando archivos...</span>
+    </div>
+
+    <!-- Progress -->
+    <div class="progress-bar-wrap" id="progressWrap">
+        <div class="progress-label">
+            <span>PROGRESO</span>
+            <span id="progressPct">0%</span>
+        </div>
+        <div class="progress-track">
+            <div class="progress-fill" id="progressFill"></div>
+        </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats" id="statsRow">
+        <div class="stat-card">
+            <div class="stat-label">Archivos</div>
+            <div class="stat-value blue" id="countFiles">0</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Riesgos</div>
+            <div class="stat-value red" id="countFindings">0</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Críticos</div>
+            <div class="stat-value cyan" id="countCritical">0</div>
+        </div>
+    </div>
+
+    <!-- Filter Bar -->
+    <div class="filter-bar" id="filterBar">
+        <button class="filter-btn active" data-filter="all">Todos</button>
+        <button class="filter-btn" data-filter="SECRETO">Secretos</button>
+        <button class="filter-btn" data-filter="VULN">Vulnerabilidades</button>
+        <button class="filter-btn" data-filter="ARCHIVO">Archivos</button>
+        <button class="filter-btn" data-filter="CRÍTICO">Críticos</button>
+        <button class="filter-btn" data-filter="ALTO">Altos</button>
+    </div>
+
+    <!-- Results -->
+    <div class="results-section">
+        <div class="section-title" id="sectionTitle" style="display:none">Hallazgos</div>
+        <div id="resultsContainer">
+            <div class="empty-state">
+                <div class="empty-icon">🔍</div>
+                <div class="empty-title">Listo para auditar</div>
+                <div class="empty-desc">Selecciona la carpeta raíz de tu proyecto para comenzar el análisis estático.</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="footer">
+        <div>SHIELDGUARD SAST v2.0</div>
+        <div>EJECUCIÓN LOCAL • SIN ENVÍO DE DATOS</div>
+    </div>
+
+</div>
+
+<script>
+const RULES = {
+    secrets: [
+        { id:"S1", name:"Firebase API Key",       rx:/AIza[0-9A-Za-z\-_]{35}/g },
+        { id:"S2", name:"AWS Access Key",          rx:/AKIA[0-9A-Z]{16}/g },
+        { id:"S3", name:"Stripe Live Key",         rx:/sk_live_[0-9a-zA-Z]{24}/g },
+        { id:"S4", name:"Private Key PEM",         rx:/-----BEGIN .* PRIVATE KEY-----/g },
+        { id:"S5", name:"GitHub Token",            rx:/ghp_[0-9a-zA-Z]{36}/g },
+        { id:"S6", name:"JWT Hardcoded",           rx:/eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/g },
+        { id:"S7", name:"Contraseña en Variable",  rx:/password\s*=\s*["'][^"']{6,}["']/gi },
+        { id:"S8", name:"Bearer Token",            rx:/Bearer\s+[A-Za-z0-9\-._~+/]+=*/g },
+    ],
+    vulnerabilities: [
+        { id:"V1", name:"Inyección SQL",           rx:/"SELECT .* \+ .*"|'SELECT .* \+ .*'/g,  lvl:"ALTO" },
+        { id:"V2", name:"Uso de eval()",            rx:/\beval\s*\(/g,                            lvl:"ALTO" },
+        { id:"V3", name:"XSS vía innerHTML",        rx:/\.innerHTML\s*=/g,                        lvl:"MEDIO" },
+        { id:"V4", name:"document.write()",         rx:/document\.write\s*\(/g,                   lvl:"MEDIO" },
+        { id:"V5", name:"exec() sin sanitizar",     rx:/\.exec\s*\(\s*req\./g,                    lvl:"ALTO" },
+        { id:"V6", name:"MD5 Inseguro",             rx:/\bmd5\s*\(/gi,                            lvl:"MEDIO" },
+        { id:"V7", name:"Redirección abierta",      rx:/window\.location\s*=\s*req\./g,           lvl:"ALTO" },
+    ],
+    files: [
+        { name:".env",                   label:"Archivo de Entorno (.env)" },
+        { name:".env.local",             label:"Entorno local" },
+        { name:"serviceaccountkey.json", label:"Admin Key Firebase" },
+        { name:"credentials.json",       label:"Credenciales JSON" },
+        { name:"id_rsa",                 label:"Llave SSH Privada" },
+        { name:"*.pem",                  label:"Certificado PEM" },
+        { name:"dump.sql",               label:"Dump de Base de Datos" },
+        { name:"htpasswd",               label:"Archivo htpasswd" },
+    ]
+};
+
+const CODE_EXT = /\.(js|ts|jsx|tsx|py|php|env|json|yaml|yml|rb|go|java|cs|vue|svelte|sh|bash|config)$/i;
+const SKIP_DIRS = new Set(['node_modules','.git','dist','build','.next','__pycache__','venv','.venv','vendor']);
+
+// ── DOM refs ──
+const scanBtn           = document.getElementById('scanBtn');
+const scanBtnLabel      = document.getElementById('scanBtnLabel');
+const scanIndicator     = document.getElementById('scanIndicator');
+const scanIndicatorText = document.getElementById('scanIndicatorText');
+const progressWrap      = document.getElementById('progressWrap');
+const progressFill      = document.getElementById('progressFill');
+const progressPct       = document.getElementById('progressPct');
+const statsRow          = document.getElementById('statsRow');
+const filterBar         = document.getElementById('filterBar');
+const resultsContainer  = document.getElementById('resultsContainer');
+const sectionTitle      = document.getElementById('sectionTitle');
+const countFiles        = document.getElementById('countFiles');
+const countFindings     = document.getElementById('countFindings');
+const countCritical     = document.getElementById('countCritical');
+const fileInput         = document.getElementById('fileInput');
+
+let allFindings = [];
+let currentFilter = 'all';
+
+// ── Use File Input for mobile ──
+scanBtn.addEventListener('click', () => fileInput.click());
+
+fileInput.addEventListener('change', async () => {
+    const files = Array.from(fileInput.files);
+    if (!files.length) return;
+    await runAudit(files);
+    fileInput.value = ''; // reset so same folder can be re-selected
+});
+
+async function runAudit(fileList) {
+    // Reset UI
+    allFindings = [];
+    currentFilter = 'all';
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.toggle('active', b.dataset.filter === 'all'));
+
+    scanBtn.disabled = true;
+    scanBtn.classList.add('is-scanning-btn');
+    scanBtnLabel.textContent = 'Analizando...';
+
+    scanIndicator.classList.add('visible');
+    progressWrap.classList.add('visible');
+    statsRow.classList.remove('visible');
+    filterBar.classList.remove('visible');
+    sectionTitle.style.display = 'none';
+
+    resultsContainer.innerHTML = '';
+
+    const total = fileList.length;
+    let processed = 0;
+
+    for (const file of fileList) {
+        processed++;
+
+        // Progress
+        const pct = Math.round((processed / total) * 100);
+        progressFill.style.width = pct + '%';
+        progressPct.textContent = pct + '%';
+
+        // File path
+        const path = file.webkitRelativePath || file.name;
+
+        // Skip noisy dirs
+        const parts = path.split('/');
+        if (parts.some(p => SKIP_DIRS.has(p))) continue;
+
+        const nameLower = file.name.toLowerCase();
+
+        // Check sensitive file names
+        for (const f of RULES.files) {
+            if (nameLower.includes(f.name.replace('*.',''))) {
+                allFindings.push({ type:"ARCHIVO", name:f.label, sev:"CRÍTICO", path });
+            }
+        }
+
+        // Check content
+        if (CODE_EXT.test(file.name) && file.size < 2 * 1024 * 1024) {
+            try {
+                const text = await file.text();
+                for (const s of RULES.secrets) {
+                    if (s.rx.test(text)) {
+                        allFindings.push({ type:"SECRETO", name:s.name, sev:"CRÍTICO", path });
+                    }
+                    s.rx.lastIndex = 0;
+                }
+                for (const v of RULES.vulnerabilities) {
+                    if (v.rx.test(text)) {
+                        allFindings.push({ type:"VULN", name:v.name, sev:v.lvl, path });
+                    }
+                    v.rx.lastIndex = 0;
+                }
+            } catch(e) { /* unreadable */ }
+        }
+
+        // Update scanning label
+        if (processed % 10 === 0) {
+            scanIndicatorText.textContent = `Analizando: ${path.split('/').pop()}`;
+            await new Promise(r => setTimeout(r, 0)); // yield to UI
+        }
+    }
+
+    finishAudit(total);
+}
+
+function finishAudit(totalFiles) {
+    scanBtn.disabled = false;
+    scanBtn.classList.remove('is-scanning-btn');
+    scanBtnLabel.textContent = 'Nueva Auditoría';
+
+    scanIndicator.classList.remove('visible');
+    progressWrap.classList.remove('visible');
+
+    const criticals = allFindings.filter(f => f.sev === 'CRÍTICO').length;
+
+    countFiles.textContent    = totalFiles;
+    countFindings.textContent = allFindings.length;
+    countCritical.textContent = criticals;
+
+    statsRow.classList.add('visible');
+
+    if (allFindings.length > 0) {
+        filterBar.classList.add('visible');
+        sectionTitle.style.display = 'block';
+    }
+
+    renderResults(allFindings);
+}
+
+function renderResults(findings) {
+    resultsContainer.innerHTML = '';
+
+    if (findings.length === 0 && allFindings.length === 0) {
+        resultsContainer.innerHTML = `
+            <div class="clean-card">
+                <div class="clean-icon">✅</div>
+                <div class="clean-title">Proyecto Limpio</div>
+                <div class="clean-desc">No se encontraron riesgos de seguridad conocidos.</div>
+            </div>`;
+        return;
+    }
+
+    if (findings.length === 0) {
+        resultsContainer.innerHTML = `
+            <div class="empty-state">
+                <div class="empty-icon">🔎</div>
+                <div class="empty-title">Sin resultados</div>
+                <div class="empty-desc">No hay hallazgos para este filtro.</div>
+            </div>`;
+        return;
+    }
+
+    const sevOrder = { 'CRÍTICO':0, 'ALTO':1, 'MEDIO':2 };
+    const sorted = [...findings].sort((a,b) => (sevOrder[a.sev]??9) - (sevOrder[b.sev]??9));
+
+    sorted.forEach((f, i) => {
+        const card = document.createElement('div');
+        card.className = `finding-card sev-${f.sev.toLowerCase().replace('í','i')}`;
+        card.style.animationDelay = `${i * 40}ms`;
+        card.innerHTML = `
+            <div class="card-header">
+                <div class="card-left">
+                    <span class="card-type-badge">${f.type}</span>
+                    <span class="card-name">${f.name}</span>
+                </div>
+                <span class="sev-badge ${f.sev}">${f.sev}</span>
+            </div>
+            <div class="card-path">${f.path}</div>
+        `;
+        resultsContainer.appendChild(card);
+    });
+}
+
+// ── Filter logic ──
+document.getElementById('filterBar').addEventListener('click', e => {
+    const btn = e.target.closest('.filter-btn');
+    if (!btn) return;
+
+    currentFilter = btn.dataset.filter;
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+
+    let filtered;
+    if (currentFilter === 'all') {
+        filtered = allFindings;
+    } else if (['CRÍTICO','ALTO','MEDIO'].includes(currentFilter)) {
+        filtered = allFindings.filter(f => f.sev === currentFilter);
+    } else {
+        filtered = allFindings.filter(f => f.type === currentFilter);
+    }
+    renderResults(filtered);
+});
+
+// ── PWA minimal SW ──
+if ('serviceWorker' in navigator) {
+    const sw = `self.addEventListener('fetch',()=>{});`;
+    const blob = new Blob([sw], { type:'text/javascript' });
+    navigator.serviceWorker.register(URL.createObjectURL(blob)).catch(()=>{});
+}
+</script>
+</body>
+</html>
