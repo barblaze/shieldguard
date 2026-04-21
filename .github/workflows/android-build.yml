@@ -1,0 +1,67 @@
+name: Build & Sign APK Final
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Source
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Dependencies
+        run: |
+          npm install --force
+          npm install @capacitor/core @capacitor/cli @capacitor/android --force
+
+      - name: Build Web Assets
+        run: |
+          npm run build --if-present
+
+      - name: Prepare Capacitor
+        run: |
+          mkdir -p www
+          mkdir -p dist
+          mkdir -p build
+          
+          npx cap add android || true
+          npx cap sync android
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: gradle
+
+      - name: Build Android Release
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew clean
+          ./gradlew assembleRelease
+
+      - name: Sign and Align APK
+        run: |
+          BUILD_TOOLS_PATH=$(ls -d $ANDROID_HOME/build-tools/* | tail -1)
+          APK_PATH="android/app/build/outputs/apk/release/app-release-unsigned.apk"
+          
+          keytool -genkey -v -keystore release.keystore -alias manager_alias -keyalg RSA -keysize 2048 -validity 10000 -storepass "password123" -keypass "password123" -dname "CN=LukasGym, OU=Dev, O=LukasGym, L=Los Andes, ST=Valparaiso, C=CL"
+          
+          $BUILD_TOOLS_PATH/zipalign -v 4 $APK_PATH ManagerAssist-aligned.apk
+          
+          $BUILD_TOOLS_PATH/apksigner sign --ks release.keystore --ks-key-alias manager_alias --ks-pass pass:password123 --key-pass pass:password123 --out ManagerAssist-Final.apk ManagerAssist-aligned.apk
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: ManagerAssist-Release-v1
+          path: ManagerAssist-Final.apk
